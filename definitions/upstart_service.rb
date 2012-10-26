@@ -19,10 +19,31 @@ default_attributes = {
 }
 
 define :upstart_service, default_attributes do
+  def add_process(init_dir, params, process_name, command)
+    template "#{init_dir}/#{params[:name]}-#{process_name}.conf" do
+      owner params[:owner]
+      group params[:group]
+      mode 0644
+      source "main-service.conf.erb"
+      variables params.merge(:command => command, :process_name => process_name)
+      cookbook params[:cookbook] || "upstart"
+    end
+
+    1.upto(params[:scale].to_i) do |n|
+      template "#{init_dir}/#{params[:name]}-#{process_name}-#{n}.conf" do
+        owner params[:owner]
+        group params[:group]
+        mode 0644
+        source "main-service-1.conf.erb"
+        variables params.merge(:command => command, :process_name => process_name)
+        cookbook params[:cookbook] || "upstart"
+      end
+    end
+  end
+
   init_dir  = "/etc/init"
   main_conf = "#{params[:name]}.conf"
-
-  params[:log_dir] ||= "/var/log"
+  log_dir   = (params[:log_dir] ||= "/var/log")
 
   directory "#{log_dir}" do
     owner params[:owner]
@@ -34,43 +55,30 @@ define :upstart_service, default_attributes do
   template "#{init_dir}/#{main_conf}" do
     owner params[:owner]
     group params[:group]
-    mode 0755
+    mode 0644
     source "main.conf.erb"
     variables params
-    cookbook params[:cookbook] if params[:cookbook]
+    cookbook params[:cookbook] || "upstart"
   end
 
   if procs = params[:processes]
-    new_params = params.clone
+    new_params = params.dup
     procs.each_pair do |process_name, command|
-      new_params[:process_name] = process_name
-      new_params[:command] = command
-
-      add_process(init_dir, new_params)
+      add_process(init_dir, new_params, process_name, command)
     end
   else
-    add_process(init_dir, params)
-  end
-end
-
-def add_process(init_dir, params)
-  template "#{init_dir}/#{params[:name]}-#{params[:process_name]}.conf" do
-    owner params[:owner]
-    group params[:group]
-    mode 0755
-    source "main-service.conf.erb"
-    variables params
-    cookbook params[:cookbook] if params[:cookbook]
+    add_process(init_dir, params, params[:process_name], params[:command])
   end
 
-  [1..params[:scale].to_i].each do |n|
-    template "#{init_dir}/#{params[:name]}-#{params[:process_name]}-#{n}.conf" do
-      owner params[:owner]
-      group params[:group]
-      mode 0755
-      source "main-service-1.conf.erb"
-      variables params
-      cookbook params[:cookbook] if params[:cookbook]
-    end
+  service params[:name] do
+    provider Chef::Provider::Service::Upstart
+    supports :restart => true, :status => true
+
+    # start_command "start #{params[:name]}"
+    # stop_command "stop #{params[:name]}"
+    # restart_command "restart #{params[:name]} 2>/dev/null || start #{params[:name]}"
+    # status_command "status #{params[:name]}"
+
+    action :nothing
   end
 end

@@ -1,5 +1,5 @@
-start on starting <%= name %>-<%= process_name %>
-stop on stopping <%= name %>-<%= process_name %>
+start on starting <%= @name %>-<%= @process_name %>
+stop on stopping <%= @name %>-<%= @process_name %>
 respawn
 
-exec su - <%= name %> -c 'cd <%= path %>; <%= command %> >> <%= log_dir %>/<%= name %>/<%= process_name %>-1.log 2>&1'
+exec su - <%= @owner %> -c 'cd <%= @path %>; <%= @command %> >> <%= @log_dir %>/<%= @name %>/<%= @process_name %>-1.log 2>&1'
